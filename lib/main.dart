@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Potřebné pro FilteringTextInputFormatter
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -53,19 +53,21 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   late final Stream<List<Map<String, dynamic>>> _ordersStream;
 
-  // Textové kontrolery pro formulář
+  // Textové kontrolery
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   final _zipController = TextEditingController();
   final _vsController = TextEditingController();
-  final _paymentController = TextEditingController(); // Vráceno zpět
   final _productController = TextEditingController();
   final _priceController = TextEditingController();
   final _shippingController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _statusController = TextEditingController();
+
+  // Boolean stav pro přepínač platby
+  bool _isPaid = false;
 
   bool _showInlineInput = false;
   dynamic _editingOrderId; 
@@ -86,7 +88,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _cityController.dispose();
     _zipController.dispose();
     _vsController.dispose();
-    _paymentController.dispose();
     _productController.dispose();
     _priceController.dispose();
     _shippingController.dispose();
@@ -110,7 +111,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       'mesto': _cityController.text,
       'psc': _zipController.text,
       'variabilni_symbol': _vsController.text,
-      'prijata_platba': double.tryParse(_paymentController.text) ?? 0.0, // Číselná hodnota
+      'prijata_platba': _isPaid, // Posíláme čisté True/False
       'zbozi': _productController.text,
       'cena': double.tryParse(_priceController.text) ?? 0.0,
       'doprava': _shippingController.text,
@@ -155,7 +156,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _cityController.text = order['mesto'] ?? '';
       _zipController.text = order['psc'] ?? '';
       _vsController.text = order['variabilni_symbol'] ?? '';
-      _paymentController.text = order['prijata_platba']?.toString() ?? '';
+      _isPaid = order['prijata_platba'] == true; // Načtení booleanu z DB
       _productController.text = order['zbozi'] ?? order['typ_produktu'] ?? '';
       _priceController.text = order['cena']?.toString() ?? '';
       _shippingController.text = order['doprava'] ?? '';
@@ -172,7 +173,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _cityController.clear();
     _zipController.clear();
     _vsController.clear();
-    _paymentController.clear();
     _productController.clear();
     _priceController.clear();
     _shippingController.clear();
@@ -180,6 +180,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _emailController.clear();
     _statusController.clear();
     setState(() {
+      _isPaid = false;
       _editingOrderId = null;
       _showInlineInput = false;
     });
@@ -222,7 +223,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink.shade700, fontSize: 16),
                   ),
                   const SizedBox(height: 12),
-                  // Řádek 1: Základní údaje o zákazníkovi
                   Row(
                     children: [
                       Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Jméno (Zákazník)', isDense: true))),
@@ -233,7 +233,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Řádek 2: Adresa (včetně PSČ pouze na čísla)
                   Row(
                     children: [
                       Expanded(flex: 2, child: TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Adresa', isDense: true))),
@@ -251,7 +250,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Řádek 3: Detaily o zboží a logistice
                   Row(
                     children: [
                       Expanded(flex: 2, child: TextField(controller: _productController, decoration: const InputDecoration(labelText: 'Zboží', isDense: true))),
@@ -262,7 +260,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Řádek 4: Finance a číselná omezení (VS, Cena, Přijatá platba)
                   Row(
                     children: [
                       Expanded(
@@ -282,16 +279,25 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           decoration: const InputDecoration(labelText: 'Cena (Kč)', isDense: true),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: _paymentController, 
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d*'))], // Pouze číselné hodnoty Kč
-                          decoration: const InputDecoration(labelText: 'Přijatá platba (Kč)', isDense: true),
-                        ),
+                      const SizedBox(width: 24),
+                      // KLIKACÍ PŘEPÍNAČ BOOLEAN
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Zaplaceno:', style: TextStyle(fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 8),
+                          Switch(
+                            value: _isPaid,
+                            activeColor: Colors.green,
+                            onChanged: (bool value) {
+                              setState(() {
+                                _isPaid = value;
+                              });
+                            },
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
+                      const Spacer(),
                       ElevatedButton.icon(
                         onPressed: _saveOrder,
                         icon: const Icon(Icons.save),
@@ -304,7 +310,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
           
-          // Hlavní dynamický seznam načítaný v reálném čase
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: _ordersStream,
@@ -320,6 +325,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   itemBuilder: (context, index) {
                     final order = orders[index];
                     final String currentStatus = order['stav'] ?? 'Nová';
+                    final bool paidStatus = order['prijata_platba'] == true;
 
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -356,8 +362,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 child: Text(
                                   '🔢 VS: ${order['variabilni_symbol'] ?? '-'}\n'
                                   '💰 Cena Celkem: ${order['cena'] ?? 0} Kč\n'
-                                  '💳 Přijatá platba: ${order['prijata_platba'] ?? 0} Kč', // Zobrazení částky v seznamu
-                                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.grey.shade800),
+                                  '💳 Platba: ${paidStatus ? "ZAPLACENO ✅" : "NEZAPLACENO ❌"}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold, 
+                                    color: paidStatus ? Colors.green.shade800 : Colors.red.shade800
+                                  ),
                                 ),
                               ),
                             ],
