@@ -8,6 +8,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Installs the localization system package required by lib/main.dart
+  flutter_localizations:
+    sdk: flutter
   supabase_flutter: ^2.8.0
 
 flutter:
