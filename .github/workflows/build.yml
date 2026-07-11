@@ -1,3 +1,7 @@
+name: Build App Targets
+on: [push, workflow_dispatch]
+
+jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
@@ -33,3 +37,28 @@
         with:
           name: android-apks
           path: build/app/outputs/flutter-apk/*.apk
+
+  build-exe:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      # 1. Generates core project files safely
+      - run: flutter create . --platforms=windows
+      
+      # 2. Re-injects missing localized packages manually into pubspec
+      - run: flutter pub add flutter_localizations --sdk=flutter
+      - run: flutter pub add supabase_flutter:^2.8.0
+      
+      - run: flutter pub get
+      - run: flutter build windows
+      
+      - name: Upload Windows Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: build/windows/x64/runner/Release/
