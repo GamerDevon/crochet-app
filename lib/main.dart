@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // TODO: Replace these strings with your absolute, real Supabase project credentials!
   await Supabase.initialize(
     url: 'https://ivzloxwkokirozungdxj.supabase.co',
     publishableKey: 'sb_publishable_zQQYp0_h_n3Tlc2FwanFuA_ApGTqc8X',
@@ -54,16 +53,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final Stream<List<Map<String, dynamic>>> _ordersStream = 
       supabase.from('objednavky').stream(primaryKey: ['id']).order('created_at', ascending: false);
 
-  // Text inputs for the inline row
+  // Text controllers
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
   final _productController = TextEditingController();
   final _priceController = TextEditingController();
   final _detailsController = TextEditingController();
+  final _statusController = TextEditingController(); // Flexible status instead of rigid dropdown
 
   bool _showInlineInput = false;
+  dynamic _editingOrderId; // Keeps track of which order we are updating (null = new order)
 
-  Future<void> _addOrder() async {
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _contactController.dispose();
+    _productController.dispose();
+    _priceController.dispose();
+    _detailsController.dispose();
+    _statusController.dispose();
+    super.dispose();
+  }
+
+  // Handles both creating a new order and updating an existing one
+  Future<void> _saveOrder() async {
     if (_nameController.text.isEmpty || _productController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Jméno a produkt musí být vyplněny!')),
@@ -71,25 +84,25 @@ class _OrdersScreenState extends State<OrdersScreen> {
       return;
     }
 
-    try {
-      await supabase.from('objednavky').insert({
-        'jmeno_zakaznika': _nameController.text,
-        'kontakt': _contactController.text,
-        'typ_produktu': _productController.text,
-        'cena': double.tryParse(_priceController.text) ?? 0.0,
-        'detaily': _detailsController.text,
-        'stav': 'Nová',
-      });
+    final data = {
+      'jmeno_zakaznika': _nameController.text,
+      'kontakt': _contactController.text,
+      'typ_produktu': _productController.text,
+      'cena': double.tryParse(_priceController.text) ?? 0.0,
+      'detaily': _detailsController.text,
+      'stav': _statusController.text.isEmpty ? 'Nová' : _statusController.text,
+    };
 
-      _nameController.clear();
-      _contactController.clear();
-      _productController.clear();
-      _priceController.clear();
-      _detailsController.clear();
-      
-      setState(() {
-        _showInlineInput = false; // Collapse row after saving
-      });
+    try {
+      if (_editingOrderId == null) {
+        // Insert new
+        await supabase.from('objednavky').insert(data);
+      } else {
+        // Update existing
+        await supabase.from('objednavky').update(data).eq('id', _editingOrderId);
+      }
+
+      _clearInputForm();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -99,16 +112,44 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  Future<void> _updateStatus(dynamic id, String newStatus) async {
+  // Deletes an order from Supabase
+  Future<void> _deleteOrder(dynamic id) async {
     try {
-      await supabase.from('objednavky').update({'stav': newStatus}).eq('id', id);
+      await supabase.from('objednavky').delete().eq('id', id);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Chyba při aktualizaci stavu: $error')),
+          SnackBar(content: Text('Chyba při mazání: $error')),
         );
       }
     }
+  }
+
+  // Populates the input form with existing data for editing
+  void _startEditing(Map<String, dynamic> order) {
+    setState(() {
+      _editingOrderId = order['id'];
+      _nameController.text = order['jmeno_zakaznika'] ?? '';
+      _contactController.text = order['kontakt'] ?? '';
+      _productController.text = order['typ_produktu'] ?? '';
+      _priceController.text = order['cena']?.toString() ?? '';
+      _detailsController.text = order['detaily'] ?? '';
+      _statusController.text = order['stav'] ?? '';
+      _showInlineInput = true; // Open the input panel
+    });
+  }
+
+  void _clearInputForm() {
+    _nameController.clear();
+    _contactController.clear();
+    _productController.clear();
+    _priceController.clear();
+    _detailsController.clear();
+    _statusController.clear();
+    setState(() {
+      _editingOrderId = null;
+      _showInlineInput = false;
+    });
   }
 
   @override
@@ -119,12 +160,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
         backgroundColor: Colors.pink.shade100,
         centerTitle: true,
         actions: [
-          // Clicking this button reveals or hides the next row editor instantly
           TextButton.icon(
             onPressed: () {
-              setState(() {
-                _showInlineInput = !_showInlineInput;
-              });
+              if (_showInlineInput) {
+                _clearInputForm();
+              } else {
+                setState(() {
+                  _showInlineInput = true;
+                });
+              }
             },
             icon: Icon(_showInlineInput ? Icons.close : Icons.add, color: Colors.black),
             label: Text(
@@ -136,13 +180,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
       body: Column(
         children: [
-          // Inline layout container that generates a new editable row
+          // Inline Editor Panel
           if (_showInlineInput)
             Container(
               color: Colors.pink.shade100.withOpacity(0.3),
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 children: [
+                  Text(
+                    _editingOrderId == null ? '➕ Nová Objednávka' : '✏️ Upravit Objednávku',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink.shade700),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -169,23 +218,31 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: _contactController, 
-                          decoration: const InputDecoration(labelText: 'Kontakt (IG, FB...)', isDense: true),
+                          decoration: const InputDecoration(labelText: 'Kontakt', isDense: true),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _detailsController, 
-                          decoration: const InputDecoration(labelText: 'Detaily / Barvy', isDense: true),
+                          decoration: const InputDecoration(labelText: 'Detaily', isDense: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _statusController, 
+                          decoration: const InputDecoration(labelText: 'Stav (např. Hotovo)', isDense: true),
                         ),
                       ),
                       IconButton(
-                        onPressed: _addOrder, 
+                        onPressed: _saveOrder, 
                         icon: const Icon(Icons.check_box, color: Colors.green, size: 32),
                       ),
                     ],
@@ -216,30 +273,73 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   itemCount: orders.length,
                   itemBuilder: (context, index) {
                     final order = orders[index];
+                    final String currentStatus = order['stav'] ?? 'Nová';
+
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       color: Colors.pink.shade50,
                       child: ListTile(
-                        title: Text(
-                          '${order['jmeno_zakaznika']} — ${order['typ_produktu']}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${order['jmeno_zakaznika']} — ${order['typ_produktu']}',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            // Simple text status badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.pink.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                currentStatus,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
                         ),
                         subtitle: Text(
                           'Kontakt: ${order['kontakt']}\nDetaily: ${order['detaily']}\nCena: ${order['cena']} Kč',
                         ),
-                        trailing: DropdownButton<String>(
-                          value: order['stav'],
-                          items: <String>['Nová', 'Rozpracovaná', 'Dokončená'].map((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            );
-                          }).toList(),
-                          onChanged: (newStatus) {
-                            if (newStatus != null) {
-                              _updateStatus(order['id'], newStatus);
-                            }
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // EDIT BUTTON
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _startEditing(order),
+                            ),
+                            // DELETE BUTTON
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                // Simple quick-delete alert
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Smazat objednávku?'),
+                                    content: const Text('Opravdu chcete tuto objednávku odstranit?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('Zrušit'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          _deleteOrder(order['id']);
+                                          Navigator.pop(ctx);
+                                        },
+                                        child: const Text('Smazat', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     );
