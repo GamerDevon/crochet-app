@@ -52,13 +52,12 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   late final Stream<List<Map<String, dynamic>>> _ordersStream;
 
-  // Textové kontrolery pro formulář
+  // Text Controllers
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   final _zipController = TextEditingController();
   final _vsController = TextEditingController();
-  final _paymentController = TextEditingController();
   final _productController = TextEditingController();
   final _priceController = TextEditingController();
   final _shippingController = TextEditingController();
@@ -66,12 +65,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final _emailController = TextEditingController();
   final _statusController = TextEditingController();
 
+  // Boolean state for payment status
+  bool _isPaid = false;
+
   bool _showInlineInput = false;
   dynamic _editingOrderId; 
 
   @override
   void initState() {
     super.initState();
+    // Listening to changes explicitly tracking the 'id' primary key
     _ordersStream = supabase
         .from('objednavky')
         .stream(primaryKey: ['id'])
@@ -85,7 +88,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _cityController.dispose();
     _zipController.dispose();
     _vsController.dispose();
-    _paymentController.dispose();
     _productController.dispose();
     _priceController.dispose();
     _shippingController.dispose();
@@ -109,7 +111,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       'mesto': _cityController.text,
       'psc': _zipController.text,
       'variabilni_symbol': _vsController.text,
-      'prijata_platba': double.tryParse(_paymentController.text) ?? 0.0,
+      'prijata_platba': _isPaid, // Now saving a boolean true/false
       'zbozi': _productController.text,
       'cena': double.tryParse(_priceController.text) ?? 0.0,
       'doprava': _shippingController.text,
@@ -154,7 +156,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _cityController.text = order['mesto'] ?? '';
       _zipController.text = order['psc'] ?? '';
       _vsController.text = order['variabilni_symbol'] ?? '';
-      _paymentController.text = order['prijata_platba']?.toString() ?? '';
+      _isPaid = order['prijata_platba'] is bool ? order['prijata_platba'] : false;
       _productController.text = order['zbozi'] ?? order['typ_produktu'] ?? '';
       _priceController.text = order['cena']?.toString() ?? '';
       _shippingController.text = order['doprava'] ?? '';
@@ -171,7 +173,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _cityController.clear();
     _zipController.clear();
     _vsController.clear();
-    _paymentController.clear();
     _productController.clear();
     _priceController.clear();
     _shippingController.clear();
@@ -179,6 +180,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _emailController.clear();
     _statusController.clear();
     setState(() {
+      _isPaid = false;
       _editingOrderId = null;
       _showInlineInput = false;
     });
@@ -221,7 +223,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink.shade700, fontSize: 16),
                   ),
                   const SizedBox(height: 12),
-                  // Řádek 1: Základní údaje o zákazníkovi
+                  // Řádek 1: Základní údaje
                   Row(
                     children: [
                       Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Jméno (Zákazník)', isDense: true))),
@@ -254,15 +256,31 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Řádek 4: Finance a uložení
+                  // Řádek 4: Finance s přepínačem platby
                   Row(
                     children: [
                       Expanded(child: TextField(controller: _vsController, decoration: const InputDecoration(labelText: 'Variabilní Symbol (VS)', isDense: true))),
                       const SizedBox(width: 12),
                       Expanded(child: TextField(controller: _priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Cena (Kč)', isDense: true))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: _paymentController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Přijatá platba (Kč)', isDense: true))),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 24),
+                      // True/False Payment Switch
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Zaplaceno:', style: TextStyle(fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 8),
+                          Switch(
+                            value: _isPaid,
+                            activeColor: Colors.green,
+                            onChanged: (bool value) {
+                              setState(() {
+                                _isPaid = value;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
                       ElevatedButton.icon(
                         onPressed: _saveOrder,
                         icon: const Icon(Icons.save),
@@ -291,6 +309,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   itemBuilder: (context, index) {
                     final order = orders[index];
                     final String currentStatus = order['stav'] ?? 'Nová';
+                    final bool paidStatus = order['prijata_platba'] == true;
 
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -327,8 +346,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 child: Text(
                                   '🔢 VS: ${order['variabilni_symbol'] ?? '-'}\n'
                                   '💰 Cena Celkem: ${order['cena'] ?? 0} Kč\n'
-                                  '💳 Přijato: ${order['prijata_platba'] ?? 0} Kč',
-                                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.grey.shade800),
+                                  '💳 Platba: ${paidStatus ? "ZAPLACENO ✅" : "NEZAPLACENO ❌"}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold, 
+                                    color: paidStatus ? Colors.green.shade800 : Colors.red.shade800
+                                  ),
                                 ),
                               ),
                             ],
