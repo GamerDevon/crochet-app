@@ -17,8 +17,13 @@ jobs:
         with:
           channel: 'stable'
           
-      # Dynamically creates the missing /android folder configuration structure 
+      # 1. Generates core project files safely
       - run: flutter create . --platforms=android
+      
+      # 2. Re-injects missing localized packages manually into pubspec
+      - run: flutter pub add flutter_localizations --sdk=flutter
+      - run: flutter pub add supabase_flutter:^2.8.0
+      
       - run: flutter pub get
       - run: flutter build apk --split-per-abi
       
@@ -37,8 +42,13 @@ jobs:
         with:
           channel: 'stable'
           
-      # Dynamically creates the missing /windows folder configuration structure
+      # 1. Generates core project files safely
       - run: flutter create . --platforms=windows
+      
+      # 2. Re-injects missing localized packages manually into pubspec
+      - run: flutter pub add flutter_localizations --sdk=flutter
+      - run: flutter pub add supabase_flutter:^2.8.0
+      
       - run: flutter pub get
       - run: flutter build windows
       
