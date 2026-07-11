@@ -2,38 +2,31 @@ name: Build App Targets
 on: [push, workflow_dispatch]
 
 jobs:
-  build-apk:
-    name: Build Android APK
-    runs-on: ubuntu-latest
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
           
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           
-      # 1. Generates core project files safely
-      - run: flutter create . --platforms=android
+      # 1. Generates core project Windows files safely
+      - run: flutter create . --platforms=windows
 
-      # 2. Force internet permission into the newly generated manifest
-      - name: Inject Internet Permission
-        run: |
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
-      
-      # 3. Re-injects missing localized packages manually into pubspec
+      # 2. Re-injects missing localized packages manually into pubspec
       - run: flutter pub add flutter_localizations --sdk=flutter
       - run: flutter pub add supabase_flutter:^2.8.0
       
       - run: flutter pub get
-      - run: flutter build apk --split-per-abi
       
-      - name: Upload APKs
+      # 3. Build the Windows Release target
+      - run: flutter build windows --release
+      
+      # 4. Upload the built executable zip artifact
+      - name: Upload Windows Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: android-apks
-          path: build/app/outputs/flutter-apk/*.apk
+          name: windows-app
+          path: build/windows/x64/runner/Release/
