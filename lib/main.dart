@@ -52,7 +52,7 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   final Stream<List<Map<String, dynamic>>> _ordersStream = 
-      supabase.from('orders').stream(primaryKey: ['id']).order('created_at', ascending: false);
+      supabase.from('objednavky').stream(primaryKey: ['id']).order('created_at', ascending: false);
 
   // Text inputs for the inline row
   final _nameController = TextEditingController();
@@ -72,7 +72,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
 
     try {
-      await supabase.from('orders').insert({
+      await supabase.from('objednavky').insert({
         'jmeno_zakaznika': _nameController.text,
         'kontakt': _contactController.text,
         'typ_produktu': _productController.text,
@@ -101,7 +101,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<void> _updateStatus(dynamic id, String newStatus) async {
     try {
-      await supabase.from('orders').update({'stav': newStatus}).eq('id', id);
+      await supabase.from('objednavky').update({'stav': newStatus}).eq('id', id);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
