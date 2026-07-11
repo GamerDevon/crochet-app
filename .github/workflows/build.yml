@@ -8,7 +8,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # Explicitly injects Java which prevents underlying Gradle compilation errors
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -18,10 +17,11 @@ jobs:
         with:
           channel: 'stable'
           
+      # Dynamically creates the missing /android folder configuration structure 
+      - run: flutter create . --platforms=android
       - run: flutter pub get
       - run: flutter build apk --split-per-abi
       
-      # Corrected path to grab all generated split-processor APK files safely
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
@@ -36,8 +36,12 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          
+      # Dynamically creates the missing /windows folder configuration structure
+      - run: flutter create . --platforms=windows
       - run: flutter pub get
       - run: flutter build windows
+      
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v4
         with:
