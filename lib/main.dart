@@ -7,7 +7,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: 'https://ivzloxwkokirozungdxj.supabase.co',
-    publishableKey: 'sb_publishable_zQQYp0_h_n3Tlc2FwanFuA_ApGTqc8X',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2emxveHdrb2tpcm96dW5nZHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NjI2NTIsImV4cCI6MjA5OTMzODY1Mn0.m2RM1NANkqCAafNzpLfy8syKNMxm4J_x3VY9nnVCvts',
   );
 
   runApp(const CrochetApp());
@@ -52,7 +52,7 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   late final Stream<List<Map<String, dynamic>>> _ordersStream;
 
-  // Expanded Text Controllers
+  // Textové kontrolery pro formulář
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
@@ -221,7 +221,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink.shade700, fontSize: 16),
                   ),
                   const SizedBox(height: 12),
-                  // Row 1: Basic Info
+                  // Řádek 1: Základní údaje o zákazníkovi
                   Row(
                     children: [
                       Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Jméno (Zákazník)', isDense: true))),
@@ -232,7 +232,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Row 2: Address Info
+                  // Řádek 2: Adresa
                   Row(
                     children: [
                       Expanded(flex: 2, child: TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Adresa', isDense: true))),
@@ -243,7 +243,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Row 3: Product & Logistics Info
+                  // Řádek 3: Detaily o zboží a logistice
                   Row(
                     children: [
                       Expanded(flex: 2, child: TextField(controller: _productController, decoration: const InputDecoration(labelText: 'Zboží', isDense: true))),
@@ -254,7 +254,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Row 4: Financial Info
+                  // Řádek 4: Finance a uložení
                   Row(
                     children: [
                       Expanded(child: TextField(controller: _vsController, decoration: const InputDecoration(labelText: 'Variabilní Symbol (VS)', isDense: true))),
@@ -275,7 +275,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
           
-          // Main dynamic stream display list
+          // Hlavní dynamický seznam načítaný v reálném čase
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: _ordersStream,
@@ -312,7 +312,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           ],
                         ),
                         subtitle: Padding(
-                          padding: const EdgeInsets.topSide(8.0),
+                          padding: const EdgeInsets.only(top: 8.0),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
