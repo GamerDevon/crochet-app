@@ -105,15 +105,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
       return;
     }
 
+    // Safe parsing for Czech locale decimals (replacing ',' with '.')
+    final priceText = _priceController.text.replaceAll(',', '.');
+    final parsedPrice = double.tryParse(priceText) ?? 0.0;
+
     final data = {
       'jmeno_zakaznika': _nameController.text,
       'adresa': _addressController.text,
       'mesto': _cityController.text,
       'psc': _zipController.text,
       'variabilni_symbol': _vsController.text,
-      'prijata_platba': _isPaid, // Posíláme čisté True/False
+      'prijata_platba': _isPaid, 
       'zbozi': _productController.text,
-      'cena': double.tryParse(_priceController.text) ?? 0.0,
+      'cena': parsedPrice,
       'doprava': _shippingController.text,
       'telefon': _phoneController.text,
       'email': _emailController.text,
@@ -156,7 +160,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _cityController.text = order['mesto'] ?? '';
       _zipController.text = order['psc'] ?? '';
       _vsController.text = order['variabilni_symbol'] ?? '';
-      _isPaid = order['prijata_platba'] == true; // Načtení booleanu z DB
+      _isPaid = order['prijata_platba'] == true; 
       _productController.text = order['zbozi'] ?? order['typ_produktu'] ?? '';
       _priceController.text = order['cena']?.toString() ?? '';
       _shippingController.text = order['doprava'] ?? '';
@@ -188,227 +192,259 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Háčkované Objednávky — Desktop Manager 🧶'),
-        backgroundColor: Colors.pink.shade100,
-        centerTitle: true,
-        actions: [
-          TextButton.icon(
-            onPressed: () {
-              if (_showInlineInput) {
-                _clearInputForm();
-              } else {
-                setState(() => _showInlineInput = true);
-              }
-            },
-            icon: Icon(_showInlineInput ? Icons.close : Icons.add, color: Colors.black),
-            label: Text(
-              _showInlineInput ? 'Zavřít' : 'Nový',
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _ordersStream,
+      builder: (context, snapshot) {
+        // Calculate total profit from loaded database snapshot logic
+        double totalProfit = 0.0;
+        if (snapshot.hasData) {
+          totalProfit = snapshot.data!
+              .where((order) => order['prijata_platba'] == true)
+              .map((order) => double.tryParse(order['cena']?.toString() ?? '0') ?? 0.0)
+              .fold(0.0, (sum, item) => sum + item);
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Háčkované Objednávky 🧶'),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade300),
+                  ),
+                  child: Text(
+                    'Zisk: ${totalProfit.toStringAsFixed(2)} Kč',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          if (_showInlineInput)
-            Container(
-              color: Colors.pink.shade100.withOpacity(0.3),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    _editingOrderId == null ? '➕ Nová Objednávka' : '✏️ Upravit Objednávku',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink.shade700, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+            backgroundColor: Colors.pink.shade100,
+            centerTitle: true,
+            actions: [
+              TextButton.icon(
+                onPressed: () {
+                  if (_showInlineInput) {
+                    _clearInputForm();
+                  } else {
+                    setState(() => _showInlineInput = true);
+                  }
+                },
+                icon: Icon(_showInlineInput ? Icons.close : Icons.add, color: Colors.black),
+                label: Text(
+                  _showInlineInput ? 'Zavřít' : 'Nový',
+                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                ),
+              )
+            ],
+          ),
+          body: Column(
+            children: [
+              if (_showInlineInput)
+                Container(
+                  color: Colors.pink.shade100.withOpacity(0.3),
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
                     children: [
-                      Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Jméno (Zákazník)', isDense: true))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Telefon', isDense: true))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email', isDense: true))),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(flex: 2, child: TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Adresa', isDense: true))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: _cityController, decoration: const InputDecoration(labelText: 'Město', isDense: true))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: _zipController, 
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          decoration: const InputDecoration(labelText: 'PSČ (pouze čísla)', isDense: true),
-                        ),
+                      Text(
+                        _editingOrderId == null ? '➕ Nová Objednávka' : '✏️ Upravit Objednávku',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink.shade700, fontSize: 16),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(flex: 2, child: TextField(controller: _productController, decoration: const InputDecoration(labelText: 'Zboží', isDense: true))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: _shippingController, decoration: const InputDecoration(labelText: 'Doprava', isDense: true))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: _statusController, decoration: const InputDecoration(labelText: 'Stav objednávky', isDense: true))),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _vsController, 
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          decoration: const InputDecoration(labelText: 'Variabilní Symbol (VS)', isDense: true),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: _priceController, 
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d*'))],
-                          decoration: const InputDecoration(labelText: 'Cena (Kč)', isDense: true),
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      // KLIKACÍ PŘEPÍNAČ BOOLEAN
+                      const SizedBox(height: 12),
                       Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Zaplaceno:', style: TextStyle(fontWeight: FontWeight.w500)),
-                          const SizedBox(width: 8),
-                          Switch(
-                            value: _isPaid,
-                            activeColor: Colors.green,
-                            onChanged: (bool value) {
-                              setState(() {
-                                _isPaid = value;
-                              });
-                            },
+                          Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Jméno (Zákazník)', isDense: true))),
+                          const SizedBox(width: 12),
+                          Expanded(child: TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Telefon', isDense: true))),
+                          const SizedBox(width: 12),
+                          Expanded(child: TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email', isDense: true))),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(flex: 2, child: TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Adresa', isDense: true))),
+                          const SizedBox(width: 12),
+                          Expanded(child: TextField(controller: _cityController, decoration: const InputDecoration(labelText: 'Město', isDense: true))),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _zipController, 
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              decoration: const InputDecoration(labelText: 'PSČ (pouze čísla)', isDense: true),
+                            ),
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: _saveOrder,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Uložit'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.pink.shade200, foregroundColor: Colors.black),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(flex: 2, child: TextField(controller: _productController, decoration: const InputDecoration(labelText: 'Zboží', isDense: true))),
+                          const SizedBox(width: 12),
+                          Expanded(child: TextField(controller: _shippingController, decoration: const InputDecoration(labelText: 'Doprava', isDense: true))),
+                          const SizedBox(width: 12),
+                          Expanded(child: TextField(controller: _statusController, decoration: const InputDecoration(labelText: 'Stav objednávky', isDense: true))),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _vsController, 
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              decoration: const InputDecoration(labelText: 'Variabilní Symbol (VS)', isDense: true),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _priceController, 
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d*'))],
+                              decoration: const InputDecoration(labelText: 'Cena (Kč)', isDense: true),
+                            ),
+                          ),
+                          const SizedBox(width: 24),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('Zaplaceno:', style: TextStyle(fontWeight: FontWeight.w500)),
+                              const SizedBox(width: 8),
+                              Switch(
+                                value: _isPaid,
+                                activeColor: Colors.green,
+                                onChanged: (bool value) {
+                                  setState(() {
+                                    _isPaid = value;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            onPressed: _saveOrder,
+                            icon: const Icon(Icons.save),
+                            label: const Text('Uložit'),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.pink.shade200, foregroundColor: Colors.black),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _ordersStream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) return Center(child: Text('Chyba stahování dat: ${snapshot.error}'));
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                
-                final orders = snapshot.data ?? [];
-                if (orders.isEmpty) return const Center(child: Text('Žádné objednávky.'));
+                ),
+              
+              Expanded(
+                child: () {
+                  if (snapshot.hasError) return Center(child: Text('Chyba stahování dat: ${snapshot.error}'));
+                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                  
+                  final orders = snapshot.data ?? [];
+                  if (orders.isEmpty) return const Center(child: Text('Žádné objednávky.'));
 
-                return ListView.builder(
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) {
-                    final order = orders[index];
-                    final String currentStatus = order['stav'] ?? 'Nová';
-                    final bool paidStatus = order['prijata_platba'] == true;
+                  return ListView.builder(
+                    itemCount: orders.length,
+                    itemBuilder: (context, index) {
+                      final order = orders[index];
+                      final String currentStatus = order['stav'] ?? 'Nová';
+                      final bool paidStatus = order['prijata_platba'] == true;
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      color: Colors.pink.shade50,
-                      child: ListTile(
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '${order['jmeno_zakaznika']} — ${order['zbozi'] ?? order['typ_produktu'] ?? ''}',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: Colors.pink.shade100, borderRadius: BorderRadius.circular(12)),
-                              child: Text(currentStatus, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                            ),
-                          ],
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        color: Colors.pink.shade50,
+                        child: ListTile(
+                          title: Row(
                             children: [
                               Expanded(
                                 child: Text(
-                                  '📞 ${order['telefon'] ?? '-'}  |  ✉️ ${order['email'] ?? '-'}\n'
-                                  '📍 ${order['adresa'] ?? ''}, ${order['mesto'] ?? ''} ${order['psc'] ?? ''}\n'
-                                  '📦 Doprava: ${order['doprava'] ?? '-'}',
+                                  '${order['jmeno_zakaznika']} — ${order['zbozi'] ?? order['typ_produktu'] ?? ''}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ),
-                              Expanded(
-                                child: Text(
-                                  '🔢 VS: ${order['variabilni_symbol'] ?? '-'}\n'
-                                  '💰 Cena Celkem: ${order['cena'] ?? 0} Kč\n'
-                                  '💳 Platba: ${paidStatus ? "ZAPLACENO ✅" : "NEZAPLACENO ❌"}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold, 
-                                    color: paidStatus ? Colors.green.shade800 : Colors.red.shade800
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(color: Colors.pink.shade100, borderRadius: BorderRadius.circular(12)),
+                                child: Text(currentStatus, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '📞 ${order['telefon'] ?? '-'}  |  ✉️ ${order['email'] ?? '-'}\n'
+                                    '📍 ${order['adresa'] ?? ''}, ${order['mesto'] ?? ''} ${order['psc'] ?? ''}\n'
+                                    '📦 Doprava: ${order['doprava'] ?? '-'}',
                                   ),
                                 ),
+                                Expanded(
+                                  child: Text(
+                                    '🔢 VS: ${order['variabilni_symbol'] ?? '-'}\n'
+                                    '💰 Cena Celkem: ${order['cena'] ?? 0} Kč\n'
+                                    '💳 Platba: ${paidStatus ? "ZAPLACENO ✅" : "NEZAPLACENO ❌"}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold, 
+                                      color: paidStatus ? Colors.green.shade800 : Colors.red.shade800
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _startEditing(order)),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Smazat objednávku?'),
+                                      content: const Text('Opravdu chcete tuto objednávku odstranit?'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Zrušit')),
+                                        TextButton(
+                                          onPressed: () {
+                                            _deleteOrder(order['id']);
+                                            Navigator.pop(ctx);
+                                          },
+                                          child: const Text('Smazat', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _startEditing(order)),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('Smazat objednávku?'),
-                                    content: const Text('Opravdu chcete tuto objednávku odstranit?'),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Zrušit')),
-                                      TextButton(
-                                        onPressed: () {
-                                          _deleteOrder(order['id']);
-                                          Navigator.pop(ctx);
-                                        },
-                                        child: const Text('Smazat', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                      );
+                    },
+                  );
+                }(),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
